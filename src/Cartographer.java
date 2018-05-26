@@ -9,8 +9,6 @@ import java.util.List;
 public class Cartographer extends Canvas {
     private double width = 0;
     private double height = 0;
-    Canvas gameMap;
-    GraphicsContext gc;
     int side;
 
     public Cartographer(double width, double height, int side) {
@@ -22,16 +20,9 @@ public class Cartographer extends Canvas {
     }
 
     public void drawMap(GraphicsContext gc, Map<Room, Pair> coords) {
-       // gc.setStroke(Color.BLUE);
-       // gc.setLineWidth(5);
-      //  gc.strokeLine(0, 10, 60, 40);
         for (Map.Entry<Room, Pair> entry: coords.entrySet()) {
             Pair pair = entry.getValue();
             Room drawRoom = entry.getKey();
-       //     gc.strokeOval(pair.x * side + CENTRE, pair.y * side + CENTRE,
-            // 5, 5);
-        //    System.out.println("Pair: " + pair.x + " , " + pair.y);
-         //   System.out.println("Room: " + drawRoom);
             drawNorth(gc, drawRoom, pair.x, pair.y);
             drawSouth(gc, drawRoom, pair.x, pair.y);
             drawEast(gc, drawRoom, pair.x, pair.y);
@@ -134,8 +125,6 @@ public class Cartographer extends Canvas {
 
     private void drawEast(GraphicsContext gc, Room drawRoom, double x, double
             y) {
-      //  gc.setStroke(Color.BLUE);
-
         double startX = x * side + width/2 + side; //one side unit away from top
         // left corner
         double startY = y * side + height/2;
@@ -151,8 +140,8 @@ public class Cartographer extends Canvas {
 
     }
 
-        public void updateMap(GraphicsContext gc, Map<Room, Pair> coords) {
-            gc.clearRect(0, 0, width, height);
-            drawMap(gc, coords);
+    public void updateMap(GraphicsContext gc, Map<Room, Pair> coords) {
+        gc.clearRect(0, 0, width, height);
+        drawMap(gc, coords);
     }
 }

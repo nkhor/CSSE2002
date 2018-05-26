@@ -4,6 +4,7 @@ import javafx.scene.Scene;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
@@ -12,6 +13,7 @@ import javafx.application.Application;
 import javafx.scene.canvas.Canvas;
 import java.util.Map;
 import java.lang.Math;
+import java.util.Optional;
 
 /**
  *  Launches GUI, expects a filename upon launch
@@ -24,7 +26,6 @@ public class CrawlGui extends Application {
 
     private static BoundsMapper bm;
     private static Room startRoom;
-    private Pair mapSize;
     private GraphicsContext gc;
     private Cartographer carto;
     private TextArea history;
@@ -36,13 +37,14 @@ public class CrawlGui extends Application {
      */
     public static void main(String[] args) {
         Object[] startingObjects;
-       /* if (args.length < 1) {
+       /** if (args.length < 1) {
             System.err.println("Usage: java CrawlGui mapname\n");
             System.exit(1);
         } else {
             try {
                 startingObjects = MapIO.loadMap(args[0]);
             } catch (Exception e) {
+                //Does not call?
                 System.err.println("Unable to load file " + args[0] + "\n");
                 System.exit(2);
             }
@@ -67,13 +69,12 @@ public class CrawlGui extends Application {
     }
 
     /**
-     * Fills the map with more rooms and things
+     * Fills the map with more rooms and things for testing
      *
      * @param startingObjects Object array of Player and starting Room
      * @return true if successful
      */
     private static void addMoreToRooms(Object[] startingObjects) {
-        //ADDING MORE TESTS TO TEST MAPPING
         Room room2 = new Room("garden");
         Room room3 = new Room("bedroom");
         Room room4 = new Room("shed");
@@ -81,17 +82,19 @@ public class CrawlGui extends Application {
         Critter bug = new Critter("bug", "big bug", 5, 10);
         Critter kitten = new Critter("kitty", "white kitty", 5, 10);
 
+        Critter dead = new Critter("dead bug", "small dead bug", 5, 0);
+
         Treasure coins = new Treasure("money", 10);
         Treasure notes = new Treasure("notes", 20);
         Treasure cash = new Treasure("cash", 20);
 
-
-        room2.enter(frog);
+        room2.enter(dead);
         room3.enter(bug);
         room4.enter(kitten);
         room3.enter(coins);
         room4.enter(notes);
         room4.enter(cash);
+
 
         if (startingObjects != null) {
             startRoom = (Room) startingObjects[1];
@@ -134,12 +137,6 @@ public class CrawlGui extends Application {
             yMap = Math.abs(bm.yMin);
         }
 
-     /*   System.out.print(bm.xMax);
-        System.out.println(bm.xMin);
-        System.out.print(bm.yMax);
-        System.out.println(bm.yMin);
-        System.out.print(xMap);
-        System.out.println(yMap);*/
         return new Pair(2 * (xMap + 1), 2 * (yMap + 1));
     }
 
@@ -294,7 +291,13 @@ public class CrawlGui extends Application {
     }
 
     private class ButtonDoer implements EventHandler<ActionEvent> {
-
+        /**
+         * Helper method to handle all button presses, depending upon the
+         * source of the button, will call the intended method and redraw the
+         * canvas if button affects graphics
+         *
+         * @param e Event object
+         */
         public void handle(ActionEvent e) {
             Button pressedButton = (Button) e.getSource();
             String toDraw = pressedButton.getText();
@@ -303,10 +306,177 @@ public class CrawlGui extends Application {
 
             //check if player is null
             if (player != null) {
-                //attempt to move player
-                movePlayer(currentRoom, player, toDraw);
+                switch (toDraw) {
+                    case "North":
+                    case "South":
+                    case "West":
+                    case "East":
+                        //attempt to move player, same method for all dirctions
+                        movePlayer(currentRoom, player, toDraw);
+                        break;
+                    case "Look":
+                        lookAt(currentRoom, player);
+                        break;
+                    case "Examine":
+                        examine(currentRoom, player);
+                        break;
+                    case "Fight":
+                     //   fightThings(currentRoom, player);
+                        break;
+                    case "Save":
+                    case "Take":
+                        takeItem(currentRoom, player);
+                        carto.updateMap(gc, bm.coords);
+                        break;
+                    case "Drop":
+                        dropItem(currentRoom, player);
+                        carto.updateMap(gc, bm.coords);
+                        break;
+                    default:
+                        history.appendText("Something prevents you from leaving\n");
+                }
+
             }
         }
+    }
+
+    /**
+     * Looks through player's inventory to find short description of item to
+     * remove and add to current room
+     *
+     * Does not update map
+     *
+     * @param currentRoom Room to add item into
+     * @param player Player whose inventory item is removed from
+     */
+    private void dropItem(Room currentRoom, Player player) {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Item to drop?");
+        Optional<String> result = dialog.showAndWait();
+
+        String entered;
+        //if user has entered something
+        if (result.isPresent() && !result.get().isEmpty()) {
+            //get result
+            entered = result.get();
+            /* player.drop will return object dropped or null if item could not
+             be found */
+            Thing tryToDropItem = player.drop(entered);
+            if (tryToDropItem != null) {
+                currentRoom.enter(tryToDropItem);
+            } else {
+                history.appendText("Nothing found with that name\n");
+            }
+        }
+    }
+
+    /**
+     * Attempts to remove an item from a room and add it into the player's
+     * inventory
+     *
+     * Will fail silently if attempting to pick up a live Mob and if .leave()
+     * returns false - if something in room wishes to fight item
+     * @param currentRoom
+     * @param player
+     */
+    private void takeItem(Room currentRoom, Player player) {
+        TextInputDialog dialog = new TextInputDialog();
+        Optional<String> result = dialog.showAndWait();
+
+        String entered;
+
+        dialog.setTitle("Take what?");
+
+        if (result.isPresent() && !result.get().isEmpty()) {
+            entered = result.get();
+            for (Thing item : currentRoom.getContents()) {
+                //if item meets the description, is not a player and can
+                // leave the room i.e. nothing wants to fight it
+                if (item.getShort().equals(entered) && !(item instanceof
+                        Player)) {
+                    //if instance of mob
+                    if (item instanceof Mob) {
+                        Mob mobItem = (Mob) item;
+                        if (!mobItem.isAlive()) {
+                            //will actually remove item from room
+                            //If possible to remove from room, add to invent
+                            if (currentRoom.leave(item)) {
+                                player.add(item);
+                                //stop loop once found
+                                break;
+                            }
+                        }
+                    //if not instance of mob
+                    } else {
+                        if (currentRoom.leave(item)){
+                            player.add(item);
+                            //stop loop once found
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void examine(Room currentRoom, Player player) {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Examine what?");
+        Optional<String> result = dialog.showAndWait();
+
+        String entered;
+        boolean found = false;
+
+        //if user has entered something
+        if (result.isPresent() && !result.get().isEmpty()) {
+            entered = result.get();
+            for (Thing item : player.getContents()) {
+                if (item.getShort().equals(entered)) {
+                    history.appendText(item.getLong() + "\n");
+                    found = true;
+                    break;
+                }
+            }
+            if (found == false) {
+                for (Thing item : currentRoom.getContents()) {
+                    if (item.getShort().equals(entered)) {
+                        history.appendText(item.getLong() + "\n");
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (found == false) {
+                history.appendText("Nothing found with that name\n");
+            }
+        }
+    }
+
+    private void lookAt(Room currentRoom, Player player) {
+        double totalWorth = 0;
+
+        history.appendText(currentRoom.getDescription() + " - you see:\n");
+        for (Thing item : currentRoom.getContents()) {
+            history.appendText(" " + item.getShort() +"\n");
+        }
+        history.appendText("You are carrying:");
+        for (Thing item : player.getContents()) {
+            history.appendText("\n " + item.getShortDescription());
+            if (item instanceof Treasure) {
+                Treasure treas = (Treasure) item;
+                totalWorth = totalWorth + treas.getValue();
+            } else if (item instanceof Critter) {
+                Critter crit = (Critter) item;
+                totalWorth = totalWorth + crit.getValue();
+            }
+        }
+
+        history.appendText("\nworth " + totalWorth + " in total\n");
+    }
+
+    private void fightThings(Room currentRoom, Player player) {
+        history.appendText("Fight!!!!\n");
+
     }
 
     /**
@@ -324,7 +494,7 @@ public class CrawlGui extends Application {
         if (currentRoom.getExits().containsKey(exitDirection)) {
             //find room to try to move into
             Room nextRoom = currentRoom.getExits().get(exitDirection);
-            System.out.println("        into " + nextRoom.getDescription());
+            //System.out.println("        into " + nextRoom.getDescription());
             //try to leave
             if (currentRoom.leave(player)) {
                 currentRoom.leave(player);
