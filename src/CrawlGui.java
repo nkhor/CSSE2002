@@ -12,8 +12,8 @@ import javafx.stage.Stage;
 import javafx.application.Application;
 import javafx.scene.canvas.Canvas;
 import java.util.Map;
-import java.lang.Math;
 import java.util.Optional;
+import java.lang.Math;
 
 /**
  *  Launches GUI, expects a filename upon launch
@@ -23,12 +23,15 @@ import java.util.Optional;
 public class CrawlGui extends Application {
 
     private static BoundsMapper bm;
+    //Used only to save map called by button listener
+    private static Room startRoom;
 
-    private GraphicsContext gc;
+    private GraphicsContext gContext;
     private Cartographer carto;
     private TextArea history;
     private BorderPane borderPane;
-    private int side = 38;
+
+    private final int side = 38;
 
 
     /**
@@ -39,7 +42,7 @@ public class CrawlGui extends Application {
      */
     public static void main(String[] args) {
         Object[] startingObjects;
-       /** if (args.length != 1) {
+        if (args.length != 1) {
             System.err.println("Usage: java CrawlGui mapname\n");
             System.exit(1);
         } else {
@@ -51,15 +54,14 @@ public class CrawlGui extends Application {
                 System.exit(2);
             }
         }
+        startingObjects = MapIO.loadMap(args[0]);
 
-        startingObjects = MapIO.loadMap(args[0]);*/
-
-        startingObjects = MapIO.loadMap("demo.map");
+       // startingObjects = MapIO.loadMap("demo.map");
 
         if (startingObjects != null) {
-            Room startRoom = (Room) startingObjects[1];
+            startRoom = (Room) startingObjects[1];
             Player player = (Player) startingObjects[0];
-            addMoreToRooms(startingObjects, startRoom);
+          //  addMoreToRooms(startingObjects, startRoom);
 
             bm = new BoundsMapper(startRoom);
             bm.walk();
@@ -150,17 +152,31 @@ public class CrawlGui extends Application {
         return new Pair(2 * (xMap + 1), 2 * (yMap + 1));
     }
 
+    /**
+     * Starts the canvas where rooms will be drawn
+     *
+     * Uses helper mapSize to find the height and width that the canvas should
+     * be based on a Pair object. These height and widths are then used to
+     * start a canvas, graphical context and new cartographer
+     *
+     * @return gameMap - the canvas the map is drawn on
+     */
     private Canvas startCanvas() {
         //Change the width and height according to how big the loaded map is
         //base this on absolute value of coords
         Pair mapSize = mapSize(bm.coords);
-        double x = mapSize.x * side + side;
-        double y = mapSize.y * side + side;
-        carto = new Cartographer(x, y, side);
-        Canvas gameMap = new Canvas(x, y);
-        gc = gameMap.getGraphicsContext2D();
-        carto.drawMap(gc, bm.coords);
-        gc.strokeRect(0, 0, gc.getCanvas().getWidth(), gc.getCanvas().getHeight
+        double width = mapSize.x * side + side;
+        double height = mapSize.y * side + side;
+        carto = new Cartographer(width, height, side);
+        Canvas gameMap = new Canvas(width, height);
+        gContext = gameMap.getGraphicsContext2D();
+        carto.drawMap(gContext, bm.coords);
+        //to highlight where the canvas perimeter is
+        gContext.strokeRect(0, 0, gContext
+                .getCanvas().getWidth(), gContext
+
+                .getCanvas()
+                .getHeight
                 ());
         return gameMap;
     }
@@ -373,20 +389,47 @@ public class CrawlGui extends Application {
                         break;
                     case "Fight":
                         fightThings(currentRoom, player);
-                        carto.updateMap(gc, bm.coords);
+                        carto.updateMap(gContext, bm.coords);
                         break;
                     case "Save":
+                        saveGUI();
                     case "Take":
                         takeItem(currentRoom, player);
-                        carto.updateMap(gc, bm.coords);
+                        carto.updateMap(gContext, bm.coords);
                         break;
                     case "Drop":
                         dropItem(currentRoom, player);
-                        carto.updateMap(gc, bm.coords);
+                        carto.updateMap(gContext, bm.coords);
                         break;
                 }
             }
         }
+    }
+
+    /**
+     * Method for Save button which prompts user via dialog box to enter
+     * a filename to save current map to. Then tries to save map using MapIO
+     * .saveMap and indicates outcome on GUI
+     *
+     * Relies on the first room being the first element in BoundsMapper
+     * coords, which loadMap also relies on.
+     */
+    private void saveGUI() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Save filename");
+        Optional<String> result = dialog.showAndWait();
+
+        String entered;
+        //if user has entered something
+        if (result.isPresent() && !result.get().isEmpty()) {
+            entered = result.get();
+            if (MapIO.saveMap(startRoom, entered)){
+                history.appendText("Saved\n");
+            } else {
+                history.appendText("Unable to save\n");
+            }
+        }
+        history.appendText("Enter valid filename\n");
     }
 
     /**
@@ -545,7 +588,10 @@ public class CrawlGui extends Application {
     }
 
     /**
+     * Method for Fight button, prompts user for a short description of the
+     * thing to fight
      *
+     * Silently fails if there is no matching alive Critter
      *
      * @param currentRoom
      * @param player
@@ -581,7 +627,7 @@ public class CrawlGui extends Application {
     }
 
     /**
-     * Disables buttons after game is over
+     * Disables buttons after game is over and writes a game over message
      */
     private void endGame() {
         history.appendText("Game over\n");
@@ -616,7 +662,7 @@ public class CrawlGui extends Application {
                 history.appendText("Something prevents you from leaving\n");
             }
 
-            carto.updateMap(gc, bm.coords);
+            carto.updateMap(gContext, bm.coords);
         } else {
             history.appendText("No door that way\n");
         }
