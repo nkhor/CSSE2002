@@ -20,24 +20,26 @@ import java.util.Optional;
  *
  *  Loads three main areas of GUI
  */
-
 public class CrawlGui extends Application {
-    private int side = 38;
 
     private static BoundsMapper bm;
-    private static Room startRoom;
+
     private GraphicsContext gc;
     private Cartographer carto;
     private TextArea history;
+    private BorderPane borderPane;
+    private int side = 38;
+
 
     /**
-     * Expects filename to load map, launches program
+     * Expects filename to load map as first command line argument, loads
+     * file and sets up map, and launches application
      *
      * @param args Command line arguments
      */
     public static void main(String[] args) {
         Object[] startingObjects;
-       /** if (args.length < 1) {
+       /** if (args.length != 1) {
             System.err.println("Usage: java CrawlGui mapname\n");
             System.exit(1);
         } else {
@@ -54,10 +56,10 @@ public class CrawlGui extends Application {
 
         startingObjects = MapIO.loadMap("demo.map");
 
-        addMoreToRooms(startingObjects);
         if (startingObjects != null) {
-            startRoom = (Room) startingObjects[1];
+            Room startRoom = (Room) startingObjects[1];
             Player player = (Player) startingObjects[0];
+            addMoreToRooms(startingObjects, startRoom);
 
             bm = new BoundsMapper(startRoom);
             bm.walk();
@@ -74,32 +76,39 @@ public class CrawlGui extends Application {
      * @param startingObjects Object array of Player and starting Room
      * @return true if successful
      */
-    private static void addMoreToRooms(Object[] startingObjects) {
+    private static void addMoreToRooms(Object[] startingObjects, Room
+            startRoom) {
         Room room2 = new Room("garden");
         Room room3 = new Room("bedroom");
         Room room4 = new Room("shed");
         Critter frog = new Critter("frog", "green frog", 5, 10);
         Critter bug = new Critter("bug", "big bug", 5, 10);
         Critter kitten = new Critter("kitty", "white kitty", 5, 10);
+        Critter kitten2 = new Critter("kitty", "white kitty", 5, 10);
+        Critter kitten3 = new Critter("kitty", "white kitty", 5, 10);
 
         Critter dead = new Critter("dead bug", "small dead bug", 5, 0);
 
         Treasure coins = new Treasure("money", 10);
         Treasure notes = new Treasure("notes", 20);
         Treasure cash = new Treasure("cash", 20);
+        Treasure cash2 = new Treasure("cash", 20);
+        Treasure cash3 = new Treasure("cash", 20);
 
         room2.enter(dead);
         room3.enter(bug);
         room4.enter(kitten);
+        room4.enter(kitten2);
+        room4.enter(kitten3);
+
         room3.enter(coins);
         room4.enter(notes);
         room4.enter(cash);
+        room4.enter(cash2);
+        room4.enter(cash3);
 
 
         if (startingObjects != null) {
-            startRoom = (Room) startingObjects[1];
-            Player player = (Player) startingObjects[0];
-
             try {
                 Room.makeExitPair(room2, startRoom, "North", "South");
                 Room.makeExitPair(room2, room3, "East", "West");
@@ -112,14 +121,15 @@ public class CrawlGui extends Application {
     /**
      * Returns the (x,y) dimensions the map should be based upon the furthest
      * room's coordinate
-     * *
-     * Map origin will always load in centre of canvas, origin may not
-     * necessarily be the middle room, thus canvas size must be double
-     * furthest room to origin to ensure all rooms are loaded in all directions
-     * <p>
-     * Room coord will be left corner of room, so if furthest room is East
-     * of origin, right side of room will not be within canvas. Thus, buffer
-     * of +1 is added to both sides
+     *
+     * Map origin will always load in centre of canvas, but the origin point
+     * may not necessarily be the middle room, thus canvas size must be
+     * double the distance of the furthest wall (*) to the origin to ensure all
+     * rooms are loaded in all directions
+     *
+     * (*) Room's coord will be top left corner of room, so if furthest room is
+     * East or South of origin, right or bottom side of room will not be within
+     * canvas. Thus, buffer of +1 * side length is added to both sides
      *
      * @param coords Map of rooms to room coordinates
      * @return mapSize as Pair(x, y) or (0,0) if no max or mins
@@ -155,7 +165,12 @@ public class CrawlGui extends Application {
         return gameMap;
     }
 
-    // Called to start doing application stuff
+    /**
+     * Starts the application window using a BorderPane to hold three main
+     * GUI elements (map, buttons and text box)
+     *
+     * @param stage Stage to display GUI on
+     */
     @Override
     public void start(Stage stage) {
         stage.setTitle("Crawl - Explore");
@@ -167,6 +182,17 @@ public class CrawlGui extends Application {
 
     }
 
+    /**
+     * Top level method to make three main GUI elements by creating a
+     * TextArea and calling individual methods for remaining elements (canvas
+     * and buttons)
+     *
+     * Buttons are assembled using two GridPanes (one for directions, other
+     * for functionality), and then put into a Vbox which is added to the
+     * BorderPane
+     *
+     * @return BorderPane that elements are in
+     */
     private BorderPane makeGUIElements() {
         //starting Canvas
         Canvas canvas = startCanvas();
@@ -177,6 +203,12 @@ public class CrawlGui extends Application {
         history.setEditable(false);
         history.appendText("You find yourself in " +
                 roomPlayerIsIn().getDescription() + "\n");
+
+        //Overall layout
+        //BorderPane must be initialised before buttons and be passed into
+        // button maker methods because their event handler will need to
+        // disable
+        // these buttons if the player dies
 
         //Direction Buttons
         GridPane dirnGrid = makeDirectionGrid();
@@ -190,13 +222,21 @@ public class CrawlGui extends Application {
         allButtons.getChildren().addAll(funcGrid);
 
         //Overall Layout
-        BorderPane bp = new BorderPane();
-        bp.setCenter(canvas);
-        bp.setBottom(history);
-        bp.setRight(allButtons);
-        return bp;
+        borderPane = new BorderPane();
+        borderPane.setCenter(canvas);
+        borderPane.setBottom(history);
+        borderPane.setRight(allButtons);
+        return borderPane;
     }
 
+    /**
+     * Creates function buttons, sets value of action property when clicked
+     * and adds them to a GridPane
+     *
+     * Function buttons are: Look, Examine, Drop, Take, Fight and Save
+     *
+     * @return GridPane buttons have been added to
+     */
     private GridPane makeFunctionGrid() {
         GridPane funcGrid = new GridPane();
         //Make new event handler for all button presses
@@ -232,10 +272,17 @@ public class CrawlGui extends Application {
         return funcGrid;
     }
 
+    /**
+     * Creates direction buttons, sets value of action property when clicked
+     * and adds them to a GridPane
+     *
+     * Direction buttons are: North, South, East and West
+     *
+     * @return GridPane buttons have been added to
+     */
     private GridPane makeDirectionGrid() {
         GridPane dirnGrid = new GridPane();
         EventHandler<ActionEvent> e = new ButtonDoer();
-
 
         Button northButt = new Button("North");
         northButt.setOnAction(e);
@@ -290,7 +337,11 @@ public class CrawlGui extends Application {
         return null;
     }
 
+    /**
+     * Helper class to manage button functionality
+     */
     private class ButtonDoer implements EventHandler<ActionEvent> {
+
         /**
          * Helper method to handle all button presses, depending upon the
          * source of the button, will call the intended method and redraw the
@@ -321,7 +372,8 @@ public class CrawlGui extends Application {
                         examine(currentRoom, player);
                         break;
                     case "Fight":
-                     //   fightThings(currentRoom, player);
+                        fightThings(currentRoom, player);
+                        carto.updateMap(gc, bm.coords);
                         break;
                     case "Save":
                     case "Take":
@@ -332,10 +384,7 @@ public class CrawlGui extends Application {
                         dropItem(currentRoom, player);
                         carto.updateMap(gc, bm.coords);
                         break;
-                    default:
-                        history.appendText("Something prevents you from leaving\n");
                 }
-
             }
         }
     }
@@ -419,6 +468,17 @@ public class CrawlGui extends Application {
         }
     }
 
+    /**
+     * Finds the long description of the first occurring item whose short
+     * description is entered by user in dialog box
+     *
+     * Checks player's inventory first, then the contents of the given room
+     *
+     * Displays "Nothing found with that name" if no item in inventory or
+     * room is found to match given short description
+     * @param currentRoom Room to find item in
+     * @param player Player whose inventory is to be searched
+     */
     private void examine(Room currentRoom, Player player) {
         TextInputDialog dialog = new TextInputDialog();
         dialog.setTitle("Examine what?");
@@ -452,6 +512,16 @@ public class CrawlGui extends Application {
         }
     }
 
+    /**
+     * Called when Look button is pressed and will display the following
+     * information on the game GUI:
+     *  Short description of room
+     *  Items player is carrying
+     *  Total worth of items carried
+     *
+     * @param currentRoom Room whose contents are to be looked at
+     * @param player Player whose inventory is to be looked at
+     */
     private void lookAt(Room currentRoom, Player player) {
         double totalWorth = 0;
 
@@ -474,14 +544,57 @@ public class CrawlGui extends Application {
         history.appendText("\nworth " + totalWorth + " in total\n");
     }
 
+    /**
+     *
+     *
+     * @param currentRoom
+     * @param player
+     */
     private void fightThings(Room currentRoom, Player player) {
-        history.appendText("Fight!!!!\n");
-
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Fight what?");
+        Optional<String> result = dialog.showAndWait();
+        String entered;
+        //if user has entered something
+        if (result.isPresent() && !result.get().isEmpty()) {
+            //get result
+            entered = result.get();
+            for (Thing fighter : currentRoom.getContents()) {
+                if (fighter.getShort().equals(entered)){
+                    if (fighter instanceof Critter) {
+                        Critter crit = (Critter) fighter;
+                        if (crit.isAlive()) {
+                            player.fight(crit);
+                            //if player dies
+                            if (!player.isAlive()) {
+                                endGame();
+                                break;// to only fight one match of descript
+                            } else {
+                                history.appendText("You won\n");
+                                break; //to only fight one critter
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
-     * Atte,pts to move the player across the map while checking if there is
+     * Disables buttons after game is over
+     */
+    private void endGame() {
+        history.appendText("Game over\n");
+        borderPane.getRight().setDisable(true);
+    }
+
+
+    /**
+     * Attempts to move the player across the map while checking if there is
      * an exit existing or if the player is prevented from leaving
+     *
+     * Called when any directional button is pressed - North, South East and
+     * West
      *
      * @param currentRoom Current room player is in
      * @param player Player object to move
@@ -494,7 +607,6 @@ public class CrawlGui extends Application {
         if (currentRoom.getExits().containsKey(exitDirection)) {
             //find room to try to move into
             Room nextRoom = currentRoom.getExits().get(exitDirection);
-            //System.out.println("        into " + nextRoom.getDescription());
             //try to leave
             if (currentRoom.leave(player)) {
                 currentRoom.leave(player);
