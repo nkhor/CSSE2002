@@ -393,6 +393,7 @@ public class CrawlGui extends Application {
                         break;
                     case "Save":
                         saveGUI();
+                        break;
                     case "Take":
                         takeItem(currentRoom, player);
                         carto.updateMap(gContext, bm.coords);
@@ -416,6 +417,9 @@ public class CrawlGui extends Application {
      */
     private void saveGUI() {
         TextInputDialog dialog = new TextInputDialog();
+        //Removing default graphics
+        dialog.setGraphic(null);
+        dialog.setHeaderText(null);
         dialog.setTitle("Save filename");
         Optional<String> result = dialog.showAndWait();
 
@@ -429,7 +433,6 @@ public class CrawlGui extends Application {
                 history.appendText("Unable to save\n");
             }
         }
-        history.appendText("Enter valid filename\n");
     }
 
     /**
@@ -443,7 +446,9 @@ public class CrawlGui extends Application {
      */
     private void dropItem(Room currentRoom, Player player) {
         TextInputDialog dialog = new TextInputDialog();
-        dialog.setTitle("Item to drop?");
+        //Removing default graphics
+        dialog.setGraphic(null);
+        dialog.setHeaderText(null);        dialog.setTitle("Item to drop?");
         Optional<String> result = dialog.showAndWait();
 
         String entered;
@@ -468,11 +473,14 @@ public class CrawlGui extends Application {
      *
      * Will fail silently if attempting to pick up a live Mob and if .leave()
      * returns false - if something in room wishes to fight item
-     * @param currentRoom
-     * @param player
+     * @param currentRoom Room to take item from
+     * @param player Player whose inventory is added to
      */
     private void takeItem(Room currentRoom, Player player) {
         TextInputDialog dialog = new TextInputDialog();
+        //Removing default graphics
+        dialog.setGraphic(null);
+        dialog.setHeaderText(null);
         Optional<String> result = dialog.showAndWait();
 
         String entered;
@@ -524,6 +532,9 @@ public class CrawlGui extends Application {
      */
     private void examine(Room currentRoom, Player player) {
         TextInputDialog dialog = new TextInputDialog();
+        //Removing default graphics
+        dialog.setGraphic(null);
+        dialog.setHeaderText(null);
         dialog.setTitle("Examine what?");
         Optional<String> result = dialog.showAndWait();
 
@@ -593,11 +604,14 @@ public class CrawlGui extends Application {
      *
      * Silently fails if there is no matching alive Critter
      *
-     * @param currentRoom
-     * @param player
+     * @param currentRoom Room in which to find the player and critter
+     * @param player Player which is to fight the critter
      */
     private void fightThings(Room currentRoom, Player player) {
         TextInputDialog dialog = new TextInputDialog();
+        //Removing default graphics
+        dialog.setGraphic(null);
+        dialog.setHeaderText(null);
         dialog.setTitle("Fight what?");
         Optional<String> result = dialog.showAndWait();
         String entered;
